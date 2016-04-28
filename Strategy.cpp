@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <set>
 #include <ctime>
 #include <ctime>
 #include <fstream>
@@ -9,13 +10,15 @@
 #include "node.h"
 #include <conio.h>
 #include <atlstr.h>
+#include <assert.h>
 #pragma comment(lib, "winmm.lib")
 using namespace std;
-vector <Node> v;
-int present_pos;
+
+set <int> forb_child;
+int present_pos=0;
 ofstream fout("a.txt");
-#define pInt(str,x) _cprintf("%s=%d\n"str,x)
-const unsigned long uppertime=4500;
+const unsigned long uppertime=1000;
+const int rounds=3;
 /*
 	策略函数接口,该函数被对抗平台调用,每次传入当前状态,要求输出你的落子点,该落子点必须是一个符合游戏规则的落子点,不然对抗平台会直接认为你的程序有误
 	
@@ -40,6 +43,7 @@ const unsigned long uppertime=4500;
 extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const int* top, const int* _board, 
 	const int lastX, const int lastY, const int noX, const int noY){
 	AllocConsole();
+	_cprintf("%d",sizeof(Node));
 	int x = -1, y = -1;
 	int** board = new int*[M];
 	for(int i = 0; i < M; i++){
@@ -48,6 +52,7 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
 			board[i][j] = _board[i * N + j];
 		}
 	}
+	board[noX][noY]=-1;
 	int **temp_board=new int*[M];
 	for(int i = 0; i < M; i++){
 		temp_board[i] = new int[N];
@@ -55,153 +60,154 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
 			temp_board[i][j] = _board[i * N + j];
 		}
 	}
-	//fout<<"M="<<M<<endl<<"N="<<N<<endl<<"lastX="<<lastX<<endl<<"lastY="<<lastY<<endl<<"noX="<<noX<<endl<<"noY"<<noY<<endl;
+	//_cprintf("\n\n\n-----------GO------------\n");
 	int *temp_top=new int[N],*temp_temp_top=new int[N];
 	refresh_top(N,temp_top,top);
-	refresh_top(N,temp_temp_top,top);
-	int stone_num=0;
-	for(int i = 0; i < M; i++){
-		for(int j = 0; j < N; j++){
-			if(board[i][j])
-				stone_num++;
-		}
-	}
-	Node t;
-	if((stone_num/2)==0){//区分是否是一开局的情形
-		v.push_back(t);
-		v.back().index=0;
-		present_pos=0;
-	}/*然后来到当前的局面，如果现在已经下了一两步了，然后对手刚刚下了一步，那么我就需要按照对手下的方式，我来走一步，
-	 对应的就是把present_pos转移至它的某个孩子，这个孩子的特点是他的stone_posy就和传来的lasty一致。
-	 */
-	else{
-		fout<<"original_pos"<<present_pos<<endl;
-		print(board,M,N);
-		present_pos=v[present_pos].corr_child(lastY);
-		fout<<"go one way to "<<present_pos<<endl;
-		fout<<"stone_posx"<<v[present_pos].stone_posx<<" stone_posy"<<v[present_pos].stone_posy<<endl;
-
-	}/*
-	 在转到了这个位置之后，我们就开始模拟自己的下棋了。
-
-
-
-	 */
-	//判断是否有必胜的孩子
-	for(int i=0;i<v[present_pos].child.size();i++){
-		if(v[v[present_pos].child[i]].mustwin==true)
-			return new Point(v[v[present_pos].child[i]].stone_posx, v[v[present_pos].child[i]].stone_posy);
-	}
+	
+	//判断是否送冲	
 	for(int i=0;i<N;i++){
-		if(top[i]){
-			board[top[i]-1][i]=1;
-			if(userWin(top[i]-1,i,M,N,board)){
-				return new Point(top[i]-1, i);
+		if((top[i])>=2&&i!=noY){		
+			if(_userWin(top[i]-2,i,M,N,board)){
+				forb_child.insert(i);
+				_cprintf("forb_child %d\n",i);
 			}
-			board[top[i]-1][i]=0;
 		}
-	}	
+	}
+	if((top[noY]-2)==noX&&top[noY]>=3){
+		if(_userWin(top[noY]-3,noY,M,N,board)){
+			forb_child.insert(noY);
+			_cprintf("forb_child %d\n",noY);
+		}
+	}
+	else{
+		if(top[noY]>=2){
+			if(_userWin(top[noY]-2,noY,M,N,board)){
+				forb_child.insert(noY);
+				_cprintf("forb_child %d\n",noY);
+			}
+		}
+	}
+	//
+	for(int i=0;i<N;i++){
+		if(top[i]>=1&&_machineWin(top[i]-1,i,M,N,board)){
+			_cprintf("must win%d\n",i);
+			return new Point(top[i]-1, i);
+		}
+	}
+	//判断是否有对手必胜的子
+	for(int i=0;i<N;i++){
+		if(top[i]>=1&&_userWin(top[i]-1,i,M,N,board)){
+			_cprintf("must lose%d\n",i);
+			return new Point(top[i]-1, i);
+		}
+	}
+	if(samelinedoublewin(top,board,M,N,x,y)){
+		return new Point(x,y);
+	}
 	
-	
-	int temp_pos=present_pos;
+	if(difflinedoublewin(top,board,M,N,x,y)){
+		return new Point(x,y);
+	}
+
+	if(difflinedoublelose(top,board,M,N,x,y)){
+		return new Point(x,y);
+	}
+
+	vector <Node> v;
+	Node t;
+	//print(board,M,N);
+	v.push_back(t);
+	v.back().index=0;
+	int temp_pos=0;
 	DWORD starttime = timeGetTime(); //计时
 	DWORD currttime;
-	
-	for(int k=0;((currttime = timeGetTime()) - starttime) < uppertime;k++){
+	bool counternopoint=false;
+	int k;
+	for(k=0;((currttime = timeGetTime()) - starttime) < uppertime;k++){
 		int step=2;
-		//fout<<"time used:"<<((currttime = timeGetTime()) - starttime)<<endl;
-		for(int times=0;v[temp_pos].haschild==true;times++){//如果有孩子选择这个节点中最好的孩子,然后进入下一层迭代；
-		//我现在遇到的问题是这个节点时有孩子的，我应该从头开始看，如果对手下了一步，我应该怎么走
-			//fout<<"search for bc:temp_pos"<<temp_pos<<endl;
-			//v[temp_pos].print_child();
-			if(((currttime = timeGetTime()) - starttime)>uppertime)
-				_cprintf("overtime1");
-			temp_pos=v[temp_pos].best_child(1);
-			if(((currttime = timeGetTime()) - starttime)>uppertime)
-				_cprintf("overtime2");
-			//fout<<"go deep"<<times<<" time to"<<temp_pos<<endl;
+		for(int times=0;v[temp_pos].haschild==true;times++){
+			temp_pos=v[temp_pos].best_child(0.8,v);
 			board[v[temp_pos].stone_posx][v[temp_pos].stone_posy]=step;
-			//print(board,M,N);
-
 			temp_top[v[temp_pos].stone_posy]--;
-			step=3-step;//转换棋子颜色
-			//fout<<"the stone type"<<step<<endl;
+			if((v[temp_pos].stone_posx>=1)&&(board[v[temp_pos].stone_posx-1][v[temp_pos].stone_posy]==-1)){
+				temp_top[v[temp_pos].stone_posy]--;
+				assert(temp_top[v[temp_pos].stone_posy]==v[temp_pos].stone_posx-1);
+			}
+			assert(temp_top[v[temp_pos].stone_posy]==v[temp_pos].stone_posx);
+			step=3-step;
 		}
-		if(v[temp_pos].haschild==false){//找到了一个叶子节点，然后开始扩展他的孩子，扩展了孩子之后就把信息回传到顶部；然后重新开始在顶部选取最好的孩子；
+		assert(v[temp_pos].haschild==false);
+		if(v[temp_pos].mustwin==true){
+				v[temp_pos].n+=rounds;
+				v[temp_pos].result+=rounds;
+				v[temp_pos].pass_up(rounds,rounds,v);
+			}
+		else if(v[temp_pos].musttie==true){
+				v[temp_pos].n+=rounds;
+				v[temp_pos].pass_up(rounds,0,v);
+		}
+		else if(v[temp_pos].haschild==false){
+			assert(v[temp_pos].mustwin==false&&v[temp_pos].musttie==false);
 			v[temp_pos].haschild=true;
 			for(int i=0;i<N;i++){
-				if(((currttime = timeGetTime()) - starttime)>uppertime)
-				_cprintf("overtime");
 				if(temp_top[i]>0){
-					if(((currttime = timeGetTime()) - starttime)>uppertime)
-						_cprintf("overtime");
 					v.push_back(t);
-					v[temp_pos].child.push_back(v.size()-1);
-					if(i==noY&&(temp_top[i]-1)==noX){//如果即将要放子的位置是不可放点
-						temp_top[i]--;
-					}//temp_top 和board要控制不变为当前temp_pos的节点的图
-					//temp_temp_top和temp_board用来对孩子进行模拟
-					if(temp_top[i]==0){//temp_top此时已经到达了不能放子点
-						continue;
-					}
-					temp_top[i]--;
-					board[temp_top[i]][i]=step;//要区分是我方的子还是它方的子
+					v[temp_pos].child[v[temp_pos].childnum++]=v.size()-1;
 					v.back().index=v.size()-1;
 					v.back().parent=temp_pos;
-					v.back().stone_posx=temp_top[i];
+					v.back().stone_posx=temp_top[i]-1;
 					v.back().stone_posy=i;
-					if(step==2&&machineWin(temp_top[i],i,M,N,board)){
-						//fout<<"child"<<i<<"must machinewin";
-						v.back().n=100;
-						v.back().result=100;
+					if(step==2&&_machineWin(temp_top[i]-1,i,M,N,board)){
+						v.back().n=rounds;
+						v.back().result=rounds;
 						v.back().mustwin=true;
-						//print(board,M,N);
 					}
-					else if(step==1&&userWin(temp_top[i],i,M,N,board)){
-						//fout<<"child"<<i<<"must userwin";
-						v.back().n=100;
-						v.back().result=100;
-						//print(board,M,N);
+					else if(step==1&&_userWin(temp_top[i]-1,i,M,N,board)){
+						v.back().n=rounds;
+						v.back().result=rounds;
+						v.back().mustwin=true;
 					}
-					else if(isTie(N,temp_temp_top)){
-						//fout<<"must tie";
-						v.back().n=100;
+					else if(_isTie(i,N,temp_top)){
+						v.back().n=rounds;
 						v.back().result=0;
-						//print(board,M,N);
+						v.back().musttie=true;
 					}
 					else{
-						for(int j=0;j<100;j++){
-							v.back().result=v.back().result+stimulate(board,temp_top,temp_board,temp_temp_top,M,N,noX,noY,3-step);
-							//fout<<"child"<<i<<"with "<<j<<"stimulations result is "<<v.back().result<<endl;
+						for(int j=0;j<rounds;j++){
+							v.back().result=v.back().result+stimulate(board,temp_top,temp_board,temp_temp_top,M,N,noX,noY,step,temp_top[i]-1,i);
 							v.back().n++;
 						}
 					}
-					//fout<<"temp_pos"<<temp_pos<<endl;
-					//v[temp_pos].print_child();
-					v.back().pass_up();
-					board[temp_top[i]][i]=0;
-					temp_top[i]++;//恢复到父亲的状态
+					v.back().pass_up(v);
 				}
 			}
-			temp_pos=present_pos;//回到初始状态
-			refresh_board(M,N,board,_board);
-			refresh_top(N,temp_top,top);
 		}
+		temp_pos=present_pos;//回到初始状态
+		refresh_board(M,N,board,_board);
+		board[noX][noY]=-1;
+		refresh_top(N,temp_top,top);
+		
 	}
-	fout<<"search for bc:temp_pos"<<present_pos<<endl;
-	int bc=v[present_pos].best_child(0);
-	v[present_pos].print_child();
+	//_cprintf("the stimulation times:%d\n",k);
+	int bc=v[present_pos].best_child(0,v);
+	//v[present_pos].print_child();
 	x=v[bc].stone_posx;
-	y=v[bc].stone_posy;//既然选择了这步棋，我的prensent_pos的位置也要随之变化
-	present_pos=v[present_pos].corr_child(y);
-	fout<<"go the stone i choose"<<endl;
+	y=v[bc].stone_posy;
 	board[x][y]=2;
-	print(board,M,N);
-
-	fout<<"the stone i choose:x="<<x<<"y="<<y<<endl;
+	//print(board,M,N);
+	//print_fbc();
+	_cprintf("vector first:%d\n",v.front().index);
+	forb_child.clear();
+	
+	
+	v.clear();
+	v.shrink_to_fit();
+	v.swap(vector<Node>());
+	//_cprintf("the stone i choose:x=%d y=%d\n",x,y);
 	clearArray(M, N, board);
+	//_cprintf("the vector size():%d\n",v.size());
+	//_cprintf("-----------END------------\n\n\n");
 	return new Point(x, y);
-
 }
 
 

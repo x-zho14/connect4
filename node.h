@@ -6,20 +6,23 @@ using namespace std;
 class Node{
 public:
 	Node();
-	double priority(double c);
-	void pass_up();
-	int corr_child(const int lastY);
-	int best_child(double c);
-	void Node::print_child();
-	vector <int> child;
+	double priority(double c,vector <Node> &v);
+	void pass_up(vector <Node> &v);
+	void pass_up(int _n,int _result,vector <Node> &v);
+	int corr_child(const int lastY,vector <Node> &v);
+	int best_child(double c,vector <Node> &v);
+	void Node::print_child(vector <Node> &v);
+	int child[12];
+	int childnum;
 	int parent;
 	int n;
 	int result;
 	int index;
-	bool haschild;
-	bool mustwin;
 	int stone_posx;
 	int stone_posy;
+	bool haschild;
+	bool mustwin;
+	bool musttie;
 };
 
 #endif
