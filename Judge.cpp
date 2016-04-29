@@ -1,6 +1,6 @@
 #include "Judge.h"
 
-bool userWin(const int x, const int y, const int M, const int N, int* const* board){
+bool userWin(const int x, const int y, const int M, const int N, int board[15][15]){
 	//ºáÏò¼ì²â
     int i, j;
     int count = 0;
@@ -49,7 +49,7 @@ bool userWin(const int x, const int y, const int M, const int N, int* const* boa
     return false;
 }
 
-bool machineWin(const int x, const int y, const int M, const int N, int* const* board){
+bool machineWin(const int x, const int y, const int M, const int N, int board[15][15]){
 	//ºáÏò¼ì²â
     int i, j;
     int count = 0;

@@ -11,8 +11,10 @@ public:
 	void pass_up(int _n,int _result);
 	int corr_child(const int lastY);
 	int best_child(double c);
-	void Node::print_child();
-	vector <int> child;
+	void print_child();
+	void initialize();
+	int child[12];
+	int childnum;
 	int parent;
 	int n;
 	int result;

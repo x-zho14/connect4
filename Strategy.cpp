@@ -12,12 +12,19 @@
 #include <atlstr.h>
 #include <assert.h>
 #pragma comment(lib, "winmm.lib")
+#define size 6000000
 using namespace std;
-vector <Node> v;
+Node v[size];
+int cnt=0;
 set <int> forb_child;
 int present_pos=0;
 ofstream fout("a.txt");
 const unsigned long uppertime=1000;
+const int rounds=3;
+int board[15][15];
+int temp_board[15][15];
+int temp_temp_top[15];
+int temp_top[15];
 /*
 	策略函数接口,该函数被对抗平台调用,每次传入当前状态,要求输出你的落子点,该落子点必须是一个符合游戏规则的落子点,不然对抗平台会直接认为你的程序有误
 	
@@ -41,26 +48,20 @@ const unsigned long uppertime=1000;
 */
 extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const int* top, const int* _board, 
 	const int lastX, const int lastY, const int noX, const int noY){
-	
 	AllocConsole();
 	int x = -1, y = -1;
-	int** board = new int*[M];
 	for(int i = 0; i < M; i++){
-		board[i] = new int[N];
 		for(int j = 0; j < N; j++){
 			board[i][j] = _board[i * N + j];
 		}
 	}
 	board[noX][noY]=-1;
-	int **temp_board=new int*[M];
 	for(int i = 0; i < M; i++){
-		temp_board[i] = new int[N];
 		for(int j = 0; j < N; j++){
 			temp_board[i][j] = _board[i * N + j];
 		}
 	}
-	_cprintf("\n\n\n-----------GO------------\n");
-	int *temp_top=new int[N],*temp_temp_top=new int[N];
+	//_cprintf("\n\n\n-----------GO------------\n");
 	refresh_top(N,temp_top,top);
 	
 	//判断是否送冲	
@@ -111,22 +112,19 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
 	if(difflinedoublelose(top,board,M,N,x,y)){
 		return new Point(x,y);
 	}
-	
-	
-	
-	v.clear();
 	Node t;
 	//print(board,M,N);
-	v.push_back(t);
-	v.back().index=0;
+	v[cnt].initialize();
+	v[cnt++].index=0;
 	int temp_pos=0;
 	DWORD starttime = timeGetTime(); //计时
 	DWORD currttime;
 	bool counternopoint=false;
-	for(int k=0;((currttime = timeGetTime()) - starttime) < uppertime;k++){
+	int k;
+	for(k=0;((currttime = timeGetTime()) - starttime) < uppertime;k++){
 		int step=2;
 		for(int times=0;v[temp_pos].haschild==true;times++){
-			temp_pos=v[temp_pos].best_child(1);
+			temp_pos=v[temp_pos].best_child(0.8);
 			board[v[temp_pos].stone_posx][v[temp_pos].stone_posy]=step;
 			temp_top[v[temp_pos].stone_posy]--;
 			if((v[temp_pos].stone_posx>=1)&&(board[v[temp_pos].stone_posx-1][v[temp_pos].stone_posy]==-1)){
@@ -138,47 +136,48 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
 		}
 		assert(v[temp_pos].haschild==false);
 		if(v[temp_pos].mustwin==true){
-				v[temp_pos].n+=1;
-				v[temp_pos].result+=1;
-				v[temp_pos].pass_up(1,1);
+				v[temp_pos].n+=rounds;
+				v[temp_pos].result+=rounds;
+				v[temp_pos].pass_up(rounds,rounds);
 			}
 		else if(v[temp_pos].musttie==true){
-				v[temp_pos].n+=1;
-				v[temp_pos].pass_up(1,0);
+				v[temp_pos].n+=rounds;
+				v[temp_pos].pass_up(rounds,0);
 		}
 		else if(v[temp_pos].haschild==false){
 			assert(v[temp_pos].mustwin==false&&v[temp_pos].musttie==false);
 			v[temp_pos].haschild=true;
 			for(int i=0;i<N;i++){
 				if(temp_top[i]>0){
-					v.push_back(t);
-					v[temp_pos].child.push_back(v.size()-1);
-					v.back().index=v.size()-1;
-					v.back().parent=temp_pos;
-					v.back().stone_posx=temp_top[i]-1;
-					v.back().stone_posy=i;
+					v[cnt].initialize();
+					cnt++;
+					v[temp_pos].child[v[temp_pos].childnum++]=cnt-1;
+					v[cnt-1].index=cnt-1;
+					v[cnt-1].parent=temp_pos;
+					v[cnt-1].stone_posx=temp_top[i]-1;
+					v[cnt-1].stone_posy=i;
 					if(step==2&&_machineWin(temp_top[i]-1,i,M,N,board)){
-						v.back().n=100;
-						v.back().result=100;
-						v.back().mustwin=true;
+						v[cnt-1].n=rounds;
+						v[cnt-1].result=rounds;
+						v[cnt-1].mustwin=true;
 					}
 					else if(step==1&&_userWin(temp_top[i]-1,i,M,N,board)){
-						v.back().n=100;
-						v.back().result=100;
-						v.back().mustwin=true;
+						v[cnt-1].n=rounds;
+						v[cnt-1].result=rounds;
+						v[cnt-1].mustwin=true;
 					}
 					else if(_isTie(i,N,temp_top)){
-						v.back().n=100;
-						v.back().result=0;
-						v.back().musttie=true;
+						v[cnt-1].n=rounds;
+						v[cnt-1].result=0;
+						v[cnt-1].musttie=true;
 					}
 					else{
-						for(int j=0;j<100;j++){
-							v.back().result=v.back().result+stimulate(board,temp_top,temp_board,temp_temp_top,M,N,noX,noY,step,temp_top[i]-1,i);
-							v.back().n++;
+						for(int j=0;j<rounds;j++){
+							v[cnt-1].result=v[cnt-1].result+stimulate(board,temp_top,temp_board,temp_temp_top,M,N,noX,noY,step,temp_top[i]-1,i);
+							v[cnt-1].n++;
 						}
 					}
-					v.back().pass_up();
+					v[cnt-1].pass_up();
 				}
 			}
 		}
@@ -187,16 +186,19 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
 		board[noX][noY]=-1;
 		refresh_top(N,temp_top,top);
 	}
+	//_cprintf("the stimulation times:%d\n",k);
 	int bc=v[present_pos].best_child(0);
 	//v[present_pos].print_child();
 	x=v[bc].stone_posx;
 	y=v[bc].stone_posy;
 	board[x][y]=2;
 	//print(board,M,N);
-	print_fbc();
+	//print_fbc();
+	cnt=0;
+	_cprintf("vector first:%d\n",v[0].index);
 	forb_child.clear();
 	//_cprintf("the stone i choose:x=%d y=%d\n",x,y);
-	clearArray(M, N, board);
+	
 	//_cprintf("the vector size():%d\n",v.size());
 	//_cprintf("-----------END------------\n\n\n");
 	return new Point(x, y);

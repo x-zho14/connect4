@@ -21,18 +21,16 @@ extern "C" __declspec(dllexport) void clearPoint(Point* p);
 
 void clearArray(int M, int N, int** board);
 extern int present_pos;
-extern vector <Node> v;
 extern ofstream fout;
 extern set<int> forb_child;
-void refresh_board(const int M, const int N, int **board,const int* _board){
+void refresh_board(const int M, const int N, int board[15][15],const int* _board){
 	for(int i = 0; i < M; i++){
-		board[i] = new int[N];
 		for(int j = 0; j < N; j++){
 			board[i][j] = _board[i * N + j];
 		}
 	}
 }
-void refresh_board(const int M, const int N, int ** board,int** _board){
+void refresh_board(const int M, const int N, int board[15][15],int _board[15][15]){
 	for(int i = 0; i < M; i++){
 		for(int j = 0; j < N; j++){
 			board[i][j] = _board[i][j];
@@ -67,7 +65,7 @@ void print(int **board,int M,int N){
 	}
 
 }
-int stimulate(int **board,int *temp_top,int **temp_board,int *temp_temp_top,int M,int N,int noX,int noY,int step,int x,int y){
+int stimulate(int board[15][15],int *temp_top,int temp_board[15][15],int *temp_temp_top,int M,int N,int noX,int noY,int step,int x,int y){
 	refresh_board(M,N,temp_board,board);
 	refresh_top(N,temp_temp_top,temp_top);
 	temp_board[x][y]=step;
@@ -111,14 +109,14 @@ void print_fbc(){
 
 }
 
-bool _machineWin(const int x, const int y, const int M, const int N, int** board){
+bool _machineWin(const int x, const int y, const int M, const int N, int board[15][15]){
 	board[x][y]=2;
 	bool win=machineWin(x,y,M,N,board);
 	board[x][y]=0;
 	return win;
 }
 
-bool _userWin(const int x, const int y, const int M, const int N, int** board){
+bool _userWin(const int x, const int y, const int M, const int N, int board[15][15]){
 	board[x][y]=1;
 	bool win=userWin(x,y,M,N,board);
 	board[x][y]=0;
@@ -133,7 +131,7 @@ bool _isTie(const int y,const int N, int* top){
 }
 
 
-bool samelinedoublewin(const int *top,int **board,int M,int N,int &x,int &y){
+bool samelinedoublewin(const int *top,int board[15][15],int M,int N,int &x,int &y){
 	for(int i=0;i<N;i++){
 		if(top[i]>=3){
 			board[top[i]-1][i]=2;
@@ -152,7 +150,7 @@ bool samelinedoublewin(const int *top,int **board,int M,int N,int &x,int &y){
 	return false;
 }
 
-bool difflinedoublewin(const int *top,int **board,int M,int N,int &x,int &y){
+bool difflinedoublewin(const int *top,int board[15][15],int M,int N,int &x,int &y){
 	for(int i=0;i<N;i++){
 		if(top[i]>=1){
 		for(int j=0;j<N;j++){
@@ -175,7 +173,7 @@ bool difflinedoublewin(const int *top,int **board,int M,int N,int &x,int &y){
 }
 
 
-bool difflinedoublelose(const int *top,int **board,int M,int N,int &x,int &y){
+bool difflinedoublelose(const int *top,int board[15][15],int M,int N,int &x,int &y){
 	for(int i=0;i<N;i++){
 		if(top[i]>=1){
 		for(int j=0;j<N;j++){
